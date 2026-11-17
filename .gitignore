@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+
+# Raw and derived data are reproducible and too large for Git.
+data/raw/**
+data/interim/**
+data/processed/**
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Local research/vendor checkouts.
+work/
+outputs/
+cache/
+

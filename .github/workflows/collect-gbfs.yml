@@ -1,0 +1,70 @@
+name: Collect Citi Bike GBFS
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect-citibike-gbfs
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Download today's durable release assets
+        shell: bash
+        run: |
+          set -u
+          day="$(date -u +%F)"
+          mkdir -p data/raw/gbfs
+          gh release view gbfs-data >/dev/null 2>&1 || \
+            gh release create gbfs-data --title "GBFS collection data" \
+              --notes "Daily Parquet assets written by the scheduled collector."
+          for name in \
+            "station_status_${day}.parquet" \
+            "station_information_${day}.parquet" \
+            "collection_log_${day}.parquet" \
+            "quality_report_${day}.json"; do
+            gh release download gbfs-data --pattern "$name" --dir data/raw/gbfs 2>/dev/null || true
+          done
+
+      - name: Collect with retry and quality checks
+        id: collect
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: python scripts/collect_gbfs.py --strict
+
+      - name: Upload today's durable release assets
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(data/raw/gbfs/*_"$(date -u +%F)".*)
+          if (( ${#files[@]} == 0 )); then
+            echo "No collection assets were created" >&2
+            exit 1
+          fi
+          gh release upload gbfs-data "${files[@]}" --clobber
+
+      - name: Mark failed collection
+        if: steps.collect.outcome == 'failure'
+        run: exit 1
+

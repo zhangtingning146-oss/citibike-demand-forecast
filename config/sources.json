@@ -1,0 +1,44 @@
+{
+  "as_of_date": "2026-11-18",
+  "sources": [
+    {
+      "name": "Citi Bike GBFS discovery",
+      "url": "https://gbfs.citibikenyc.com/gbfs/2.3/gbfs.json",
+      "provider": "Citi Bike / Lyft",
+      "grain": "current feed discovery",
+      "license_or_terms": "NYCBS Data Use Policy"
+    },
+    {
+      "name": "Citi Bike trip history",
+      "url": "https://s3.amazonaws.com/tripdata/index.html",
+      "provider": "Citi Bike",
+      "files_used": ["202610-citibike-tripdata.zip", "202411-citibike-tripdata.zip"]
+    },
+    {
+      "name": "ctbk.dev GBFS availability archive",
+      "url": "https://data.ctbk.dev/gbfs/avail/raw/day/{YYYY-MM-DD}.parquet",
+      "provider": "hudcostreets / ctbk.dev",
+      "repository": "https://github.com/hudcostreets/ctbk.dev",
+      "observed_coverage": "2026-04-07 through 2026-11-16 with six missing days in this span"
+    },
+    {
+      "name": "MTA Subway Entrances and Exits: 2024",
+      "url": "https://data.ny.gov/d/i9wp-a4ja",
+      "provider": "Metropolitan Transportation Authority",
+      "retrieval_mirror": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/MTA_Subway_Entrances_and_Exits__2024_20250108/FeatureServer/0"
+    },
+    {
+      "name": "MTA Subway Hourly Ridership: 2020-2024",
+      "url": "https://data.ny.gov/resource/wujg-7c2s.json",
+      "provider": "Metropolitan Transportation Authority",
+      "period_used": "2024"
+    },
+    {
+      "name": "OpenStreetMap Manhattan walking network",
+      "url": "https://www.openstreetmap.org/",
+      "provider": "OpenStreetMap contributors",
+      "retrieval": "OSMnx Nominatim geocode and Overpass walking graph"
+    }
+  ]
+}
+
