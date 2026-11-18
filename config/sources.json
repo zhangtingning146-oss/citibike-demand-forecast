@@ -12,7 +12,7 @@
       "name": "Citi Bike trip history",
       "url": "https://s3.amazonaws.com/tripdata/index.html",
       "provider": "Citi Bike",
-      "files_used": ["202610-citibike-tripdata.zip", "202411-citibike-tripdata.zip"]
+      "files_used": "All 46 complete months from 2023-01 through 2026-10; 2023 annual archive was extracted into monthly ZIPs"
     },
     {
       "name": "ctbk.dev GBFS availability archive",
@@ -32,6 +32,13 @@
       "url": "https://data.ny.gov/resource/wujg-7c2s.json",
       "provider": "Metropolitan Transportation Authority",
       "period_used": "2024"
+    },
+    {
+      "name": "Open-Meteo Historical Weather API",
+      "url": "https://archive-api.open-meteo.com/v1/archive",
+      "provider": "Open-Meteo",
+      "period_used_utc": "2023-01-01 00:00 through 2026-11-01 23:00",
+      "note": "Historical observation/reanalysis for training and explanation; future targets require forecast vintages"
     },
     {
       "name": "OpenStreetMap Manhattan walking network",

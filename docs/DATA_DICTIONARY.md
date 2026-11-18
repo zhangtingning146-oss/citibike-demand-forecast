@@ -28,20 +28,38 @@ All timestamps ending in `_utc` are timezone-aware UTC. Preserve Citi Bike ident
 
 Daily files deduplicate on `(feed_last_updated_utc, station_id)`. A retry that sees the same source generation does not create another analytical observation. Collection logs remain one row per workflow attempt.
 
-## Trip station-hour panel
+## Formal trip station-hour panel
 
-| Field | Type | Meaning |
-|---|---|---|
-| `station_id` | text | Citi Bike trip station ID; matches current GBFS `short_name` where available |
-| `hour` | local naive timestamp | Hour in the source trip timestamp (America/New_York convention published by Citi Bike) |
-| `ride_in` | integer | Trips ending at the station in the hour |
-| `ride_out` | integer | Trips starting at the station in the hour |
-| `net_flow` | integer | `ride_in - ride_out` |
-| `gbfs_station_id` | text UUID | Current live-feed station ID mapped through `short_name` |
-| `station_name` | text | Current station name |
-| `lat`, `lon` | number | Current GBFS coordinates |
+The formal panel is `data/processed/panel/hourly_trips/year=YYYY/month=MM/part.parquet`. It covers all Manhattan stations found in each official trip month, not the earlier 20-station feasibility sample.
 
-The sample is a complete zero-filled grid for 20 high-volume Manhattan stations from 2024-11-25 00:00 through 2024-11-30 23:00. It contains 2,880 rows.
+| Field group | Meaning |
+|---|---|
+| `station_id`, `hour_local` | Unique panel key. The station ID remains text; the hour is the published New York civil hour. |
+| `station_name`, `lat`, `lon` | Station-month attributes derived from trip records; coordinates are trip-weighted within month. |
+| `ride_out`, `ride_in` | Hourly starts and ends. |
+| `net_outflow` | `ride_out - ride_in`. This sign convention is used throughout Stage 2. |
+| `ride_{out,in}_{classic,electric,other}` | Counts by published `rideable_type`. |
+| `ride_{out,in}_{member,casual}` | Counts by published user category. |
+| `zero_filled_active_hour` | No start or end in an hour between that station-month's first and last observed trip hour. |
+| `active_start_hour`, `active_end_hour` | Observed station-month envelope used for conservative zero filling. |
+| `gbfs_station_id_current`, `capacity_current`, `matched_current_gbfs` | Current-snapshot reference fields only. They are excluded from model-facing views because they are not historical attributes. |
+
+The active envelope avoids filling months before launch or after retirement. Trip files alone cannot identify a temporary mid-month closure, so those internal hours cannot be certified as operating. Monthly `station_month.parquet` files retain the station version, location, and envelope used to build each grid.
+
+## Weather, calendar, lags, and inventory
+
+The exact 81-field dictionary, including DuckDB types, sources, availability class, model role, and measured missing counts, is generated as `outputs/STAGE2_DATA_DICTIONARY.csv`.
+
+| Field group | Source and rule |
+|---|---|
+| Temperature, humidity, rain, snow, wind, cloud, weather code | Open-Meteo historical archive. Valid as observed training covariates; a future prediction must replace them with a forecast vintage available at issue time. |
+| Holiday and Thanksgiving fields | Deterministic calendar features known in advance. |
+| `ride_*_lag_*`, `ride_*_mean_previous_*` | Constructed within consecutive active station segments. They use preceding rows only and are for rolling forecasts, not a long-ahead fixed-date forecast. |
+| `empty_share`, `full_share`, `empty_any`, `full_any` | ctbk.dev historical GBFS outcomes. They are risk labels, not contemporaneous predictors. |
+| `capacity_observed`, bikes/docks, observation counts | Same-hour inventory observations. They describe coverage/state and are unavailable for a fixed-date future forecast. |
+| `time_split` | Chronological experiment assignment; never use as a predictor. |
+
+The repeated fall-back local hour is collapsed and flagged; the nonexistent spring-forward hour is removed from model features. UTC is retained in raw weather and inventory products.
 
 ## Subway walking accessibility
 
