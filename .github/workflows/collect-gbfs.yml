@@ -2,7 +2,8 @@ name: Collect Citi Bike GBFS
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # Offset from quarter-hour boundaries to reduce GitHub's peak cron delay.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:
