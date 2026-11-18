@@ -2,8 +2,9 @@ name: Collect Citi Bike GBFS
 
 on:
   schedule:
-    # Standard quarter-hour cadence; true acquisition time is stored in every row.
-    - cron: "*/15 * * * *"
+    # Temporary five-minute cadence for a genuine scheduled-run verification.
+    # Restore to */15 after the first event=schedule run succeeds.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
