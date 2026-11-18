@@ -2,9 +2,8 @@ name: Schedule Citi Bike GBFS
 
 on:
   schedule:
-    # Temporary offset five-minute cadence for schedule registration verification.
-    # Restore to 7,22,37,52 after the first event=schedule run succeeds.
-    - cron: "3/5 * * * *"
+    # Offset quarter-hour cadence reduces congestion near the top of the hour.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:
