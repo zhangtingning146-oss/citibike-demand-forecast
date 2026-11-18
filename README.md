@@ -1,6 +1,6 @@
 # Citi Bike station supply-demand project
 
-This repository contains the reproducible data pipeline for Manhattan Citi Bike hourly ride-in, ride-out, net-outflow, and empty/full risk research. The final case date is Thanksgiving, 2026-11-26. Stage 2 builds the formal dataset but does not train panel regression, ANN, or GRU models.
+This repository contains the reproducible data and model pipeline for Manhattan Citi Bike hourly ride-in, ride-out, net-outflow, and empty/full risk research. The final case date is Thanksgiving, 2026-11-26. Stage 3 adds strict 2024/2025 backtests, panel regression, PyTorch ANN/GRU models, inventory-risk evaluation, and a guarded forecast-freezing workflow.
 
 ## Reproduce the environment
 
@@ -21,7 +21,7 @@ $env:PYTHONPATH = "src"
 .\.venv\Scripts\python.exe scripts\collect_gbfs.py --strict
 ```
 
-The dedicated GitHub Actions scheduler calls the reusable collector every 15 minutes. The collector downloads the current UTC day's assets from a GitHub Release tagged `gbfs-data`, retries the official feeds, validates the snapshot, deduplicates by source feed timestamp and station UUID, and uploads daily Parquet plus a run log back to the release. Release assets avoid committing high-frequency data into Git history. GitHub schedules may start late; use `scripts/audit_gbfs_coverage.py` to distinguish observed and missing 15-minute slots. Missing intervals cannot be reconstructed from later live feeds.
+The intended GitHub Actions scheduler calls the reusable collector every 15 minutes. The collector downloads the current UTC day's assets from a GitHub Release tagged `gbfs-data`, retries the official feeds, validates the snapshot, deduplicates by source feed timestamp and station UUID, and uploads daily Parquet plus a run log back to the release. Release assets avoid committing high-frequency data into Git history. Native GitHub `schedule` events have not fired in this repository; only manual dispatch and persistence are verified. `docs/GBFS_EXTERNAL_SCHEDULER.md` documents the minimum-permission fallback and the required two-run validation. Missing intervals cannot be reconstructed from later live feeds.
 
 Production repository: https://github.com/zhangtingning146-oss/citibike-demand-forecast. Durable assets are stored in the `gbfs-data` release rather than Git history. See the current stage report for the distinction between manual and genuine `schedule` events.
 
@@ -64,4 +64,19 @@ The main scripts are:
 - `scripts/build_duckdb.py`: build the local analytical database and run row-count/net-flow checks.
 
 Large files under `data/` are intentionally ignored by Git. Source URLs and the acquisition date are in `config/sources.json`; field definitions and leakage constraints are in `docs/DATA_DICTIONARY.md`.
+
+## Reproduce Stage 3 models
+
+Install the GPU/model extras without changing the lightweight GBFS workflow environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-models.txt
+.\.venv\Scripts\python.exe scripts\run_stage3_experiments.py --year 2024
+.\.venv\Scripts\python.exe scripts\run_stage3_experiments.py --year 2025
+.\.venv\Scripts\python.exe scripts\summarize_stage3_results.py
+.\.venv\Scripts\python.exe scripts\train_final_demand_models.py
+.\.venv\Scripts\python.exe scripts\train_inventory_risk.py
+```
+
+The fixed-date ANN and exogenous GRU deliberately use no recent actual demand lags, because official November trips are unavailable when the Thanksgiving forecast must be made. Archived 48-hour-ahead weather forecasts are used for backtests. A forecast can be marked `final` only with a weather file retrieved on New York local November 24 or 25; earlier runs remain `preliminary`. See `docs/STAGE3_EXECUTION_REPORT.md` and `docs/STAGE3_DATA_DICTIONARY.md`.
 
