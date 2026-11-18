@@ -1,10 +1,7 @@
 name: Collect Citi Bike GBFS
 
 on:
-  schedule:
-    # Temporary five-minute cadence for a genuine scheduled-run verification.
-    # Restore to */15 after the first event=schedule run succeeds.
-    - cron: "*/5 * * * *"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

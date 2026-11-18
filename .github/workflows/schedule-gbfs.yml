@@ -1,0 +1,16 @@
+name: Schedule Citi Bike GBFS
+
+on:
+  schedule:
+    # Temporary offset five-minute cadence for schedule registration verification.
+    # Restore to 7,22,37,52 after the first event=schedule run succeeds.
+    - cron: "3/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    uses: ./.github/workflows/collect-gbfs.yml
+    secrets: inherit
