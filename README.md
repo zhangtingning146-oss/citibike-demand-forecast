@@ -23,7 +23,7 @@ $env:PYTHONPATH = "src"
 
 The GitHub Actions workflow runs every 15 minutes at minutes 07, 22, 37, and 52. It downloads the current UTC day's assets from a GitHub Release tagged `gbfs-data`, retries the official feeds, validates the snapshot, deduplicates by source feed timestamp and station UUID, and uploads daily Parquet plus a run log back to the release. Release assets avoid committing high-frequency data into Git history. GitHub schedules may start late; use `scripts/audit_gbfs_coverage.py` to distinguish observed and missing 15-minute slots. Missing intervals cannot be reconstructed from later live feeds.
 
-Production repository: https://github.com/zhangtingning146-oss/citibike-demand-forecast. The first cloud collection completed successfully on 2026-11-18 at 04:39 UTC and its four daily assets were downloaded and read back for verification.
+Production repository: https://github.com/zhangtingning146-oss/citibike-demand-forecast. Two cloud collections completed successfully on 2026-11-18 at 04:39 and 04:55 UTC. The second run downloaded the first run's assets, appended a new source generation, deduplicated, uploaded, and was read back. The resulting daily status asset had 5,038 rows, two feed times, and zero duplicate station/feed-time keys.
 
 ## Reproduce the acquired datasets
 
