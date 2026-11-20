@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import duckdb
 import numpy as np
@@ -21,6 +24,14 @@ from run_stage3_experiments import WEATHER_RENAME, regression_matrix
 
 
 TARGET_DATE = pd.Timestamp("2026-11-26")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def choose_model(metrics_path: Path) -> tuple[str, pd.DataFrame]:
@@ -154,8 +165,11 @@ def main() -> None:
     parser.add_argument("--backtest-predictions", type=Path, default=Path("data/processed/stage3/results/backtest_2025/predictions.parquet"))
     parser.add_argument("--weather-file", type=Path)
     parser.add_argument("--status", choices=("preliminary", "final"), default="preliminary")
+    parser.add_argument("--dry-run", action="store_true", help="Exercise the full pipeline without permitting final status")
     parser.add_argument("--output", type=Path, default=Path("data/processed/stage3/forecasts/2026-11-26"))
     args = parser.parse_args()
+    if args.dry_run and args.status == "final":
+        raise SystemExit("Dry-run cannot be marked final")
     if args.weather_file is None:
         candidates = sorted(Path("data/raw/weather_vintages").glob("live_20261126_retrieved_*.parquet"))
         if not candidates:
@@ -190,15 +204,27 @@ def main() -> None:
         "temperature_2m_c", "precipitation_mm", "snowfall_cm", "wind_speed_10m_max_ms",
         "profile_out", "profile_in", "profile_observations", "new_station_fallback",
     ]
-    frame[output_columns].to_parquet(args.output / f"{prefix}.parquet", index=False, compression="zstd")
-    frame[output_columns].to_csv(args.output / f"{prefix}.csv", index=False)
+    parquet_path = args.output / f"{prefix}.parquet"
+    csv_path = args.output / f"{prefix}.csv"
+    pressure_path = args.output / f"{prefix}_top_pressure.csv"
+    manifest_path = args.output / f"{prefix}_manifest.json"
+    checksums_path = args.output / f"{prefix}_SHA256SUMS.txt"
+    weather_copy = args.output / f"{prefix}_weather.parquet"
+    weather_meta_copy = args.output / f"{prefix}_weather.source.json"
+    targets = [parquet_path, csv_path, pressure_path, manifest_path, checksums_path, weather_copy, weather_meta_copy]
+    if any(path.exists() for path in targets):
+        raise FileExistsError(f"Refusing to overwrite an existing freeze artifact: {[str(path) for path in targets if path.exists()]}")
+    frame[output_columns].to_parquet(parquet_path, index=False, compression="zstd")
+    frame[output_columns].to_csv(csv_path, index=False)
     pressure = frame.groupby(["station_id", "station_name", "lat", "lon"], as_index=False).agg(
         peak_absolute_net_outflow=("predicted_net_outflow", lambda value: float(np.max(np.abs(value)))),
         daily_net_outflow=("predicted_net_outflow", "sum"),
         daily_ride_out=("predicted_ride_out", "sum"),
         daily_ride_in=("predicted_ride_in", "sum"),
     ).sort_values("peak_absolute_net_outflow", ascending=False)
-    pressure.head(50).to_csv(args.output / f"{prefix}_top_pressure.csv", index=False)
+    pressure.head(50).to_csv(pressure_path, index=False)
+    shutil.copy2(args.weather_file, weather_copy)
+    shutil.copy2(args.weather_file.with_suffix(".source.json"), weather_meta_copy)
     manifest = {
         "status": args.status, "target_local_date": "2026-11-26",
         "generated_at_utc": generated, "selected_model": selected,
@@ -212,8 +238,17 @@ def main() -> None:
         "uncertainty_q": {"ride_out": q_out, "ride_in": q_in, "net_outflow": q_net},
         "not_actual_validation": "2026-11 official trips are not published; this file is a forecast, not a verified outcome.",
         "separate_from_realtime_risk": True,
+        "dry_run": args.dry_run,
+        "checksums_file": checksums_path.name,
     }
-    (args.output / f"{prefix}_manifest.json").write_text(json.dumps(manifest, indent=2, default=str) + "\n", encoding="utf-8")
+    manifest["sha256"] = {
+        path.name: sha256_file(path) for path in (parquet_path, csv_path, pressure_path, weather_copy, weather_meta_copy)
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, default=str) + "\n", encoding="utf-8")
+    checksum_targets = (parquet_path, csv_path, pressure_path, weather_copy, weather_meta_copy, manifest_path)
+    checksums_path.write_text(
+        "".join(f"{sha256_file(path)}  {path.name}\n" for path in checksum_targets), encoding="utf-8"
+    )
     print(json.dumps(manifest, indent=2, default=str), flush=True)
 
 

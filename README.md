@@ -80,3 +80,15 @@ Install the GPU/model extras without changing the lightweight GBFS workflow envi
 
 The fixed-date ANN and exogenous GRU deliberately use no recent actual demand lags, because official November trips are unavailable when the Thanksgiving forecast must be made. Archived 48-hour-ahead weather forecasts are used for backtests. A forecast can be marked `final` only with a weather file retrieved on New York local November 24 or 25; earlier runs remain `preliminary`. See `docs/STAGE3_EXECUTION_REPORT.md` and `docs/STAGE3_DATA_DICTIONARY.md`.
 
+## Stage 4 operational checks
+
+Stage 4 keeps the Stage 3 models and evaluation boundaries unchanged. It adds demand-bias and net-error diagnostics, a pressure ranking selected on 2024 and evaluated on 2025, inventory-risk thresholds selected on September 2026 and evaluated once on October, and immutable forecast bundles with raw weather copies and SHA-256 checksums.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\analyze_stage4_pressure.py
+.\.venv\Scripts\python.exe scripts\tune_stage4_risk.py
+.\.venv\Scripts\python.exe scripts\generate_thanksgiving_forecast.py --weather-file <file> --dry-run
+```
+
+Native GitHub scheduling is now verified but severely sparse rather than 15-minute. See `docs/STAGE4_EXECUTION_REPORT.md` and `docs/GBFS_EXTERNAL_SCHEDULER.md` for the audited coverage and external-scheduler handoff.
+

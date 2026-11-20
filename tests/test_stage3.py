@@ -6,6 +6,7 @@ import pandas as pd
 from citibike_pipeline.stage3_models import (
     FEATURE_NAMES, build_numeric_features, canonical_hour_utc, demand_metrics,
 )
+from scripts.generate_thanksgiving_forecast import sha256_file
 
 
 def test_ambiguous_fall_hour_is_not_mixed() -> None:
@@ -41,3 +42,9 @@ def test_wape_and_net_metrics() -> None:
     assert result["ride_out"]["mae"] == 1.0
     assert np.isclose(result["ride_out"]["wape"], 2 / 6)
     assert result["net_outflow"]["mae"] == 0.5
+
+
+def test_sha256_file(tmp_path) -> None:
+    target = tmp_path / "payload.bin"
+    target.write_bytes(b"citibike")
+    assert sha256_file(target) == "a6ca163f334698fd0164a06bc8b0274c6ea9fcbc7f6afaefec65b87858f376cc"

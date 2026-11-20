@@ -1,10 +1,16 @@
 name: Schedule Citi Bike GBFS
+run-name: GBFS / ${{ inputs.trigger_source || github.event_name }}
 
 on:
   schedule:
     # Offset quarter-hour cadence reduces congestion near the top of the hour.
     - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
+    inputs:
+      trigger_source:
+        description: "Audit label for an external scheduler; never put secrets here"
+        required: false
+        default: "manual"
 
 permissions:
   contents: write

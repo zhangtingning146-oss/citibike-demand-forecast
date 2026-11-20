@@ -19,8 +19,8 @@ def main() -> None:
     parser.add_argument("--station-information", type=Path, required=True)
     parser.add_argument("--catalog", type=Path, default=Path("data/processed/citibike_stage2_final.duckdb"))
     parser.add_argument("--profile-dir", type=Path, default=Path("data/processed/stage3/models/final_2026"))
-    parser.add_argument("--risk-dir", type=Path, default=Path("data/processed/stage3/risk"))
-    parser.add_argument("--output", type=Path, default=Path("data/processed/stage3/realtime_risk"))
+    parser.add_argument("--risk-dir", type=Path, default=Path("data/processed/stage4/risk"))
+    parser.add_argument("--output", type=Path, default=Path("data/processed/stage4/realtime_risk"))
     args = parser.parse_args()
     status = pd.read_parquet(args.status)
     latest_feed = status["feed_last_updated_utc"].max()
@@ -68,10 +68,23 @@ def main() -> None:
     status["current_inventory_full_warning"] = status["mean_docks_available"] <= 2
     status["inventory_plus_profile_empty_warning"] = projected_bikes <= 0
     status["inventory_plus_profile_full_warning"] = projected_bikes >= status["capacity_observed"]
+    risk_meta_path = args.risk_dir / "stage4_risk_metadata.json"
+    risk_meta = json.loads(risk_meta_path.read_text(encoding="utf-8")) if risk_meta_path.exists() else {"selected": {}}
     for risk in ("empty", "full"):
-        model = joblib.load(args.risk_dir / f"{risk}_risk_logistic.joblib")
+        locked_path = args.risk_dir / f"{risk}_risk_validation_locked.joblib"
+        legacy_path = args.risk_dir / f"{risk}_risk_logistic.joblib"
+        payload = joblib.load(locked_path if locked_path.exists() else legacy_path)
+        model = payload["model"] if isinstance(payload, dict) else payload
+        threshold = float(payload.get("threshold", 0.5)) if isinstance(payload, dict) else 0.5
         status[f"logistic_probability_{risk}"] = model.predict_proba(status[NUMERIC + CATEGORICAL])[:, 1]
-        status[f"logistic_warning_{risk}"] = status[f"logistic_probability_{risk}"] >= 0.5
+        status[f"logistic_threshold_{risk}"] = threshold
+        status[f"logistic_warning_{risk}"] = status[f"logistic_probability_{risk}"] >= threshold
+        alpha = float(risk_meta.get("selected", {}).get(risk, {}).get("projected_margin_alpha", 0.0))
+        if risk == "empty":
+            projected_margin = status["mean_bikes_available"] - alpha * net
+        else:
+            projected_margin = status["mean_docks_available"] + alpha * net
+        status[f"priority_score_{risk}"] = -projected_margin / status["capacity_observed"].clip(lower=1)
     generated = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     args.output.mkdir(parents=True, exist_ok=True)
     output = args.output / f"risk_{generated}.parquet"
@@ -85,6 +98,10 @@ def main() -> None:
         "source_collected_at_utc": str(collected),
         "target_hour_utc": str(target_hour_utc),
         "rows": len(status),
+        "risk_model_directory": str(args.risk_dir),
+        "locked_thresholds": {
+            risk: float(status[f"logistic_threshold_{risk}"].iloc[0]) for risk in ("empty", "full")
+        },
         "separate_from_fixed_date_forecast": True,
         "warning": "This uses the latest live snapshot. It is not a feature in the long-ahead Thanksgiving forecast.",
     }
